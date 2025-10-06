@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Using String types for flexible enum values
+// Valid Role values: "CHILD", "PARENT"
+// Valid TransactionType values: "CREDIT", "DEBIT", "FINE", "SPEND", "INTEREST"
+// Valid ActivityCategory values: "DAILY_DISCIPLINE", "CORE_RESPONSIBILITY", "EXCEPTIONAL_BEHAVIOR", 
+//                                "MINOR_INFRACTION", "MAJOR_INFRACTION", "PRIVILEGE", "INTEREST"
+
+model User {
+  id                String              @id @default(uuid())
+  name              String
+  role              String              // "CHILD" or "PARENT"
+  pinHash           String              // bcrypt hash of 4‑digit PIN
+  currentBalance    Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  transactions      Transaction[]
+  webAuthnCredentials WebAuthnCredential[]
+}
+
+model WebAuthnCredential {
+  id              String   @id
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicKey       String
+  counter         BigInt
+  credentialType  String   @default("public-key")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  type        String   // TransactionType: "CREDIT", "DEBIT", "FINE", "SPEND", "INTEREST"
+  amount      Int      // points
+  activity    String   // predefined activity name
+  category    String   // ActivityCategory
+  createdAt   DateTime @default(now())
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  type        String   // TransactionType: "CREDIT", "DEBIT", "FINE", "SPEND", "INTEREST"
+  amount      Int      // default points
+  category    String   // ActivityCategory
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Config {
+  id                  String   @id @default(uuid())
+  rupeeCoinValue      Int      @default(10) // points per 1 Rupee coin
+  twoRupeeCoinValue   Int      @default(20) // points per 2 Rupee coin
+  paisa50Value        Int      @default(5)  // points per 50 Paisa coin
+  paisa25Value        Int      @default(2)  // points per 25 Paisa coin
+  interestRate        Int      @default(10) // weekly savings bonus percentage
+  startingCapital     Int      @default(480) // initial bank points
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model SavingsBonus {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Int      // bonus points added
+  balance     Int      // balance before bonus
+  bonusDate   DateTime @default(now())
+}

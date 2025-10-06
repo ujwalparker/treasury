@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: treasury
+    env: node
+    plan: free
+    buildCommand: yarn install && yarn prisma generate && yarn build
+    startCommand: yarn prisma db push && yarn prisma db seed && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: HOST
+        value: 0.0.0.0
