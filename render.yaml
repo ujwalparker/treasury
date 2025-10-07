@@ -4,16 +4,29 @@ services:
     env: node
     plan: free
     buildCommand: yarn install && yarn prisma generate && yarn build
-    startCommand: yarn prisma db push && yarn prisma db seed && node build
+    startCommand: node build/index.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
         generateValue: true
+      - key: DATABASE_URL
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: DATABASE_URL
       - key: HOST
-        value: 0.0.0.0
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: HOST
+      - key: ORIGIN
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: ORIGIN
       - key: PORT
         fromService:
           type: web
           name: treasury
-          property: port
+          envVarKey: PORT
