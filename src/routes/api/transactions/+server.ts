@@ -1,21 +1,20 @@
 import { json } from '@sveltejs/kit';
-import { verifyToken } from '$lib/utils/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '$lib/server/prisma';
 
-const prisma = new PrismaClient();
-
-export async function GET({ request, url }) {
+export async function GET({ locals, url }) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const session = await locals.auth();
+    
+    if (!session?.user?.email) {
       return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const user = await verifyToken(token);
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
     
     if (!user) {
-      return json({ error: 'Invalid token' }, { status: 401 });
+      return json({ error: 'User not found' }, { status: 401 });
     }
 
     // For parent users, allow fetching any child's transactions
@@ -48,18 +47,20 @@ export async function GET({ request, url }) {
   }
 }
 
-export async function POST({ request }) {
+export async function POST({ locals, request }) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const session = await locals.auth();
+    
+    if (!session?.user?.email) {
       return json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const user = await verifyToken(token);
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
     
     if (!user) {
-      return json({ error: 'Invalid token' }, { status: 401 });
+      return json({ error: 'User not found' }, { status: 401 });
     }
 
     const { type, amount, activity, category, userId } = await request.json();

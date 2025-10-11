@@ -1,33 +1,57 @@
-<script lang="ts">
+<script>
   import '../styles/globals.css';
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { initAuth, user, token } from '$lib/stores/auth';
-
-  let loading = true;
-
-  onMount(() => {
-    initAuth();
-    loading = false;
-  });
-
-  $: if (!loading) {
-    const isLoginPage = $page.url.pathname === '/login';
-    if (!$token && !isLoginPage) {
-      // Redirect to login if not authenticated
-      goto('/login');
-    } else if ($token && isLoginPage) {
-      // Redirect to dashboard if already authenticated
-      goto('/');
-    }
+  import { onMount } from 'svelte';
+  import LockScreen from '$lib/components/LockScreen.svelte';
+  import Toaster from '$lib/components/Toaster.svelte';
+  
+  let isLocked = false;
+  let inactivityTimer;
+  
+  function resetTimer() {
+    clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+      isLocked = true;
+    }, 5 * 60 * 1000); // 5 minutes
   }
+  
+  function handleActivity() {
+    if (!isLocked) resetTimer();
+  }
+  
+  function unlock() {
+    isLocked = false;
+    resetTimer();
+  }
+  
+  onMount(() => {
+    // Skip lock screen for auth pages
+    const isAuthPage = $page.url.pathname.startsWith('/login') || 
+                      $page.url.pathname.startsWith('/auth') ||
+                      $page.url.pathname.startsWith('/switch');
+    
+    if (!isAuthPage) {
+      resetTimer();
+      
+      // Listen for user activity
+      ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+        document.addEventListener(event, handleActivity, true);
+      });
+      
+      return () => {
+        clearTimeout(inactivityTimer);
+        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+          document.removeEventListener(event, handleActivity, true);
+        });
+      };
+    }
+  });
 </script>
 
-{#if loading}
-  <div class="min-h-screen flex items-center justify-center">
-    <p>Loading...</p>
-  </div>
+{#if isLocked}
+  <LockScreen on:unlock={unlock} />
 {:else}
   <slot />
 {/if}
+
+<Toaster />

@@ -13,31 +13,31 @@
   $: coins = getCoinBreakdown(balance);
 </script>
 
-<div class="bg-white shadow-md rounded-lg p-6">
-  <p class="text-gray-500 text-sm mb-1">Current Balance</p>
-  <h2 class="text-3xl font-bold">{balance} Points</h2>
+<div class="backdrop-blur-md bg-white/20 border border-white/30 shadow-lg rounded-xl p-6">
+  <p class="text-sm text-gray-600 mb-2">Current Balance</p>
+  <h2 class="text-4xl font-normal text-primary-600 mb-6">{balance} Points</h2>
   
-  <div class="flex flex-wrap gap-2 mt-4">
+  <div class="flex flex-wrap gap-3 mt-4">
     {#each Array(coins.rupee) as _, i}
-      <div class="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold">
+      <div class="w-10 h-10 bg-orange-400 rounded-full flex items-center justify-center text-xs font-medium text-white shadow-md">
         ₹1
       </div>
     {/each}
     
     {#each Array(coins.paisa50) as _, i}
-      <div class="w-7 h-7 bg-gray-300 rounded-full flex items-center justify-center text-xs font-bold">
+      <div class="w-9 h-9 bg-gray-700 rounded-full flex items-center justify-center text-xs font-medium text-white shadow-md">
         50p
       </div>
     {/each}
     
     {#each Array(coins.paisa25) as _, i}
-      <div class="w-6 h-6 bg-zinc-200 rounded-full flex items-center justify-center text-xs font-bold">
+      <div class="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-xs font-medium text-white shadow-md">
         25p
       </div>
     {/each}
     
     {#each Array(coins.paisa1) as _, i}
-      <div class="w-5 h-5 bg-zinc-100 rounded-full flex items-center justify-center text-xs font-bold">
+      <div class="w-7 h-7 bg-gray-500 rounded-full flex items-center justify-center text-xs font-medium text-gray-900 shadow-md">
         1p
       </div>
     {/each}

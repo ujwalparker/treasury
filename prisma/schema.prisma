@@ -8,21 +8,76 @@ datasource db {
 }
 
 // Using String types for flexible enum values
-// Valid Role values: "CHILD", "PARENT"
+// Valid Role values: ["CHILD"], ["PARENT"], ["ADMIN"], ["PARENT", "ADMIN"]
 // Valid TransactionType values: "CREDIT", "DEBIT", "FINE", "SPEND", "INTEREST"
 // Valid ActivityCategory values: "DAILY_DISCIPLINE", "CORE_RESPONSIBILITY", "EXCEPTIONAL_BEHAVIOR", 
 //                                "MINOR_INFRACTION", "MAJOR_INFRACTION", "PRIVILEGE", "INTEREST"
 
 model User {
   id                String              @id @default(uuid())
-  name              String
-  role              String              // "CHILD" or "PARENT"
-  pinHash           String              // bcrypt hash of 4‑digit PIN
+  name              String?
+  email             String?             @unique
+  emailVerified     DateTime?
+  image             String?
+  roles             String[]            @default(["CHILD"]) // Array of roles: "CHILD", "PARENT", "ADMIN"
+  pinHash           String?             // bcrypt hash of 4‑digit PIN
   currentBalance    Int                 @default(0)
+  familyId          String?             // Links to family
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  family            Family?             @relation(fields: [familyId], references: [id])
   transactions      Transaction[]
   webAuthnCredentials WebAuthnCredential[]
+  accounts          Account[]
+  sessions          Session[]
+  createdChildren   User[]              @relation("ParentChild")
+  parentId          String?
+  parent            User?               @relation("ParentChild", fields: [parentId], references: [id])
+}
+
+model Family {
+  id            String        @id @default(uuid())
+  name          String
+  theme         String?       // Selected animal theme
+  interests     String[]      @default([]) // Family interests/tags
+  setupComplete Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  users         User[]
+  config        FamilyConfig?
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model WebAuthnCredential {
@@ -58,8 +113,22 @@ model Activity {
   updatedAt   DateTime @updatedAt
 }
 
-model Config {
+model AdminConfig {
   id                  String   @id @default(uuid())
+  defaultLlmProvider  String   @default("groq") // "groq" or "gemini"
+  groqApiKey          String?  // Groq API key
+  geminiApiKey        String?  // Gemini API key
+  groqModel           String   @default("groq/compound-mini") // Groq model
+  geminiModel         String   @default("gemini-2.5-flash-lite") // Gemini model
+  verificationKeywords String  @default("legal drinking age, mortgage terms, Social Security, tax filing, credit score, insurance") // Keywords for verification questions
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model FamilyConfig {
+  id                  String   @id @default(uuid())
+  familyId            String   @unique
+  family              Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
   rupeeCoinValue      Int      @default(10) // points per 1 Rupee coin
   twoRupeeCoinValue   Int      @default(20) // points per 2 Rupee coin
   paisa50Value        Int      @default(5)  // points per 50 Paisa coin

@@ -20,21 +20,23 @@
     category: string;
   }
 
-  let children: Child[] = [];
-  let activities: Activity[] = [];
-  let selectedChild: Child | null = null;
-  let selectedActivity: Activity | null = null;
-  let customAmount: number | null = null;
-  let loading = true;
-  let submitLoading = false;
-  let errorMessage = '';
-  let successMessage = '';
-  let readOnlyMode = true; // Default to read-only mode for safety
+  let children = $state([]);
+  let activities = $state([]);
+  let selectedChild = $state(null);
+  let selectedActivity = $state(null);
+  let customAmount = $state(null);
+  let loading = $state(true);
+  let submitLoading = $state(false);
+  let errorMessage = $state('');
+  let successMessage = $state('');
+  let readOnlyMode = $state(true); // Default to read-only mode for safety
 
   // Redirect if not parent
-  $: if ($user && $user.role !== 'PARENT') {
-    goto('/');
-  }
+  $effect(() => {
+    if ($user && $user.role !== 'PARENT') {
+      goto('/');
+    }
+  });
 
   onMount(async () => {
     try {
@@ -61,14 +63,14 @@
     switch (type) {
       case 'CREDIT':
       case 'INTEREST':
-        return 'bg-green-100 text-green-800';
+        return 'bg-primary-100 text-primary-800';
       case 'FINE':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error-100 text-error-800';
       case 'DEBIT':
       case 'SPEND':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-secondary-100 text-secondary-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-surface-variant text-on-surface-variant';
     }
   }
 
@@ -152,15 +154,15 @@
     {:else}
       <!-- Mode Toggle -->
       <div class="flex justify-between items-center">
-        <h2 class="text-xl font-semibold">Transaction Management</h2>
+        <h2 class="headline-small text-on-surface">Transaction Management</h2>
         <div class="flex items-center">
-          <span class="text-sm mr-2">{readOnlyMode ? 'Read-Only Mode' : 'Edit Mode'}</span>
+          <span class="body-medium text-on-surface-variant mr-3">{readOnlyMode ? 'Read-Only Mode' : 'Edit Mode'}</span>
           <button 
-            class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none ${readOnlyMode ? 'bg-gray-300' : 'bg-green-500'}`}
+            class={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-300 focus:outline-none shadow-elevation-1 ${readOnlyMode ? 'bg-surface-600' : 'bg-primary-500'}`}
             on:click={toggleMode}
           >
             <span 
-              class={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${readOnlyMode ? 'translate-x-1' : 'translate-x-6'}`}
+              class={`inline-block h-6 w-6 transform rounded-full bg-surface-50 transition-transform shadow-elevation-2 ${readOnlyMode ? 'translate-x-1' : 'translate-x-7'}`}
             />
           </button>
         </div>
@@ -172,32 +174,32 @@
         </div>
       {:else}
         {#if errorMessage}
-          <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div class="bg-error-100 border border-error-300 text-error-700 px-4 py-3 rounded-xl mb-6">
             {errorMessage}
           </div>
         {/if}
         
         {#if successMessage}
-          <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          <div class="bg-primary-100 border border-primary-300 text-primary-700 px-4 py-3 rounded-xl mb-6">
             {successMessage}
           </div>
         {/if}
 
         <!-- Child Selection -->
-        <div class="bg-white shadow-md rounded-lg p-6">
-          <h3 class="text-lg font-semibold mb-4">Select Child</h3>
+        <div class="card-elevated p-6">
+          <h3 class="title-large text-on-surface mb-6">Select Child</h3>
           
           {#if children.length === 0}
-            <p class="text-gray-500">No children found</p>
+            <p class="body-large text-on-surface-variant">No children found</p>
           {:else}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {#each children as child}
                 <div 
-                  class={`border rounded-md p-4 cursor-pointer transition-colors duration-200 ${selectedChild?.id === child.id ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}
+                  class={`card-outlined p-4 cursor-pointer transition-all duration-200 ${selectedChild?.id === child.id ? 'border-primary-500 bg-primary-50 shadow-elevation-2' : 'hover:shadow-elevation-1'}`}
                   on:click={() => selectedChild = child}
                 >
-                  <p class="font-medium">{child.name}</p>
-                  <p class="text-lg font-bold mt-2">{child.currentBalance} Points</p>
+                  <p class="title-medium text-on-surface">{child.name}</p>
+                  <p class="headline-small text-primary-600 mt-2">{child.currentBalance} Points</p>
                 </div>
               {/each}
             </div>
@@ -206,32 +208,32 @@
 
         <!-- Transaction Form (only shown in edit mode) -->
         {#if !readOnlyMode}
-          <div class="bg-white shadow-md rounded-lg p-6">
-            <h3 class="text-lg font-semibold mb-4">Record Transaction</h3>
+          <div class="card-elevated p-6">
+            <h3 class="title-large text-on-surface mb-6">Record Transaction</h3>
             
             {#if !selectedChild}
-              <p class="text-yellow-600">Please select a child first</p>
+              <p class="body-large text-tertiary-600">Please select a child first</p>
             {:else}
               <form on:submit|preventDefault={handleSubmit} class="space-y-4">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Activity</label>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                  <label class="block label-large text-on-surface mb-4">Activity</label>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {#each activities as activity}
                       <div
-                        class={`border rounded-md p-3 cursor-pointer transition-colors duration-200 ${selectedActivity?.id === activity.id ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}
+                        class={`card-outlined p-4 cursor-pointer transition-all duration-200 ${selectedActivity?.id === activity.id ? 'border-primary-500 bg-primary-50 shadow-elevation-2' : 'hover:shadow-elevation-1'}`}
                         on:click={() => {
                           selectedActivity = activity;
                           customAmount = activity.amount;
                         }}
                       >
                         <div class="flex justify-between items-center">
-                          <span class="font-medium">{activity.name}</span>
-                          <span class={`inline-block px-2 py-1 text-xs font-semibold rounded ${getActivityTypeClass(activity.type)}`}>
+                          <span class="title-medium text-on-surface">{activity.name}</span>
+                          <span class={`inline-block px-3 py-1 label-small rounded-lg ${getActivityTypeClass(activity.type)}`}>
                             {activity.type}
                           </span>
                         </div>
-                        <p class="text-sm text-gray-500 mt-1">{getCategoryDisplayName(activity.category)}</p>
-                        <p class="font-semibold mt-1">{activity.type === 'FINE' || activity.type === 'DEBIT' || activity.type === 'SPEND' ? '-' : '+'}{activity.amount} Points</p>
+                        <p class="body-medium text-on-surface-variant mt-2">{getCategoryDisplayName(activity.category)}</p>
+                        <p class="title-medium text-primary-600 mt-2">{activity.type === 'FINE' || activity.type === 'DEBIT' || activity.type === 'SPEND' ? '-' : '+'}{activity.amount} Points</p>
                       </div>
                     {/each}
                   </div>
@@ -239,21 +241,21 @@
                 
                 {#if selectedActivity}
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Points (Custom Amount)</label>
+                    <label class="block label-large text-on-surface mb-2">Points (Custom Amount)</label>
                     <input
                       type="number"
                       bind:value={customAmount}
-                      class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      class="input-outlined w-full"
                       min="1"
                     />
                   </div>
                 {/if}
                 
-                <div class="flex justify-between pt-4">
+                <div class="flex flex-col sm:flex-row gap-4 pt-6">
                   <button
                     type="button"
                     on:click={handleCalculateInterest}
-                    class="py-2 px-4 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:opacity-50"
+                    class="btn-tonal disabled:opacity-50"
                     disabled={!selectedChild || submitLoading}
                   >
                     Calculate Weekly Interest
@@ -261,7 +263,7 @@
                   
                   <button
                     type="submit"
-                    class="py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    class="btn-filled disabled:opacity-50"
                     disabled={!selectedChild || !selectedActivity || submitLoading}
                   >
                     {submitLoading ? 'Processing...' : 'Record Transaction'}

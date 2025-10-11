@@ -5,7 +5,9 @@ export interface User {
   id: string;
   name: string;
   role: string;
+  roles?: string[];
   currentBalance: number;
+  avatar?: string;
 }
 
 export const user = writable<User | null>(null);
@@ -22,6 +24,7 @@ export function login(authToken: string, userData: User) {
 export function logout() {
   if (browser) {
     localStorage.removeItem('authToken');
+    localStorage.removeItem('socialSession');
     token.set(null);
     user.set(null);
   }
@@ -45,4 +48,21 @@ export function initAuth() {
       }
     }
   }
+}
+
+export function clearSocialSession() {
+  if (browser) {
+    localStorage.removeItem('socialSession');
+  }
+}
+
+export function hasSocialSession() {
+  if (browser) {
+    const socialSession = localStorage.getItem('socialSession');
+    if (socialSession) {
+      const session = JSON.parse(socialSession);
+      return new Date(session.expires) > new Date();
+    }
+  }
+  return false;
 }

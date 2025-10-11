@@ -1,102 +1,110 @@
 import { json } from '@sveltejs/kit';
 import { verifyToken } from '$lib/utils/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '$lib/server/prisma';
+import { DEFAULT_GROQ_MODEL, DEFAULT_GEMINI_MODEL } from '$env/static/private';
+import type { RequestEvent } from '@sveltejs/kit';
 
-const prisma = new PrismaClient();
-
-export async function GET({ request }) {
+export async function GET({ request, locals }: RequestEvent) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return json({ error: 'Unauthorized' }, { status: 401 });
+    // Try Auth.js session first
+    const session = await locals.auth?.();
+    let userEmail = session?.user?.email;
+    let userRoles = session?.user?.roles;
+
+    // Fallback to JWT token
+    if (!userEmail) {
+      const authHeader = request.headers.get('authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        return json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const token = authHeader.substring(7);
+      const user = await verifyToken(token);
+      
+      if (!user) {
+        return json({ error: 'Invalid token' }, { status: 401 });
+      }
+      userRoles = [user.role];
     }
 
-    const token = authHeader.substring(7);
-    const user = await verifyToken(token);
-    
-    if (!user) {
-      return json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    // Only parents can access configuration
-    if (user.role !== 'PARENT') {
+    // Only ADMIN can access configuration
+    if (!userRoles?.includes('ADMIN')) {
       return json({ error: 'Permission denied' }, { status: 403 });
     }
 
-    const config = await prisma.config.findFirst({
-      where: { id: 'default-config' }
-    }) || await prisma.config.create({
-      data: {
-        id: 'default-config',
-        rupeeCoinValue: 10,
-        twoRupeeCoinValue: 20,
-        paisa50Value: 5,
-        paisa25Value: 2,
-        interestRate: 10,
-        startingCapital: 480,
-      }
+    const config = await prisma.adminConfig.findFirst() || await prisma.adminConfig.create({
+      data: {}
     });
 
-    return json(config);
+    return json({
+      ...config,
+      groqModel: config.groqModel || DEFAULT_GROQ_MODEL,
+      geminiModel: config.geminiModel || DEFAULT_GEMINI_MODEL
+    });
   } catch (error) {
     return json({ error: 'Failed to fetch configuration' }, { status: 500 });
   }
 }
 
-export async function PUT({ request }) {
+export async function PUT({ request, locals }: RequestEvent) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return json({ error: 'Unauthorized' }, { status: 401 });
+    // Try Auth.js session first
+    const session = await locals.auth?.();
+    let userEmail = session?.user?.email;
+    let userRoles = session?.user?.roles;
+
+    // Fallback to JWT token
+    if (!userEmail) {
+      const authHeader = request.headers.get('authorization');
+      if (!authHeader?.startsWith('Bearer ')) {
+        return json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const token = authHeader.substring(7);
+      const user = await verifyToken(token);
+      
+      if (!user) {
+        return json({ error: 'Invalid token' }, { status: 401 });
+      }
+      userRoles = [user.role];
     }
 
-    const token = authHeader.substring(7);
-    const user = await verifyToken(token);
-    
-    if (!user) {
-      return json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    // Only parents can update configuration
-    if (user.role !== 'PARENT') {
+    // Only ADMIN can update configuration
+    if (!userRoles?.includes('ADMIN')) {
       return json({ error: 'Permission denied' }, { status: 403 });
     }
 
     const { 
-      rupeeCoinValue,
-      twoRupeeCoinValue,
-      paisa50Value,
-      paisa25Value,
-      interestRate,
-      startingCapital
+      defaultLlmProvider,
+      groqApiKey,
+      geminiApiKey,
+      groqModel,
+      geminiModel,
+      verificationKeywords
     } = await request.json();
 
-    // Validate values
-    if (rupeeCoinValue < 0 || twoRupeeCoinValue < 0 || paisa50Value < 0 || 
-        paisa25Value < 0 || interestRate < 0 || startingCapital < 0) {
-      return json({ error: 'All values must be positive numbers' }, { status: 400 });
+    if (defaultLlmProvider && !['groq', 'gemini'].includes(defaultLlmProvider)) {
+      return json({ error: 'Invalid LLM provider' }, { status: 400 });
     }
 
-    const updatedConfig = await prisma.config.upsert({
-      where: { id: 'default-config' },
-      update: {
-        rupeeCoinValue,
-        twoRupeeCoinValue,
-        paisa50Value,
-        paisa25Value,
-        interestRate,
-        startingCapital
-      },
-      create: {
-        id: 'default-config',
-        rupeeCoinValue,
-        twoRupeeCoinValue,
-        paisa50Value,
-        paisa25Value,
-        interestRate,
-        startingCapital
-      }
-    });
+    const updateData: any = {};
+    if (defaultLlmProvider !== undefined) updateData.defaultLlmProvider = defaultLlmProvider;
+    if (groqApiKey !== undefined) updateData.groqApiKey = groqApiKey;
+    if (geminiApiKey !== undefined) updateData.geminiApiKey = geminiApiKey;
+    if (groqModel !== undefined) updateData.groqModel = groqModel;
+    if (geminiModel !== undefined) updateData.geminiModel = geminiModel;
+    if (verificationKeywords !== undefined) updateData.verificationKeywords = verificationKeywords;
+
+    const existingConfig = await prisma.adminConfig.findFirst();
+    
+    const updatedConfig = existingConfig 
+      ? await prisma.adminConfig.update({
+          where: { id: existingConfig.id },
+          data: updateData
+        })
+      : await prisma.adminConfig.create({
+          data: updateData
+        });
 
     return json(updatedConfig);
   } catch (error) {

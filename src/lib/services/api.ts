@@ -1,23 +1,19 @@
-import { get } from 'svelte/store';
-import { token } from '$lib/stores/auth';
-
 class ApiClient {
   private getHeaders() {
-    const authToken = get(token);
     return {
-      'Content-Type': 'application/json',
-      ...(authToken && { Authorization: `Bearer ${authToken}` })
+      'Content-Type': 'application/json'
     };
   }
 
   async request(endpoint: string, options: RequestInit = {}) {
     const response = await fetch(`/api${endpoint}`, {
       ...options,
+      credentials: 'include',
       headers: { ...this.getHeaders(), ...options.headers }
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json().catch(() => ({ error: 'Request failed' }));
       throw new Error(error.error || 'Request failed');
     }
 

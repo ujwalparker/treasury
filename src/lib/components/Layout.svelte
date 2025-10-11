@@ -1,27 +1,27 @@
 <script lang="ts">
   import { user, logout } from '$lib/stores/auth';
   import { page } from '$app/stores';
+  import type { Snippet } from 'svelte';
 
-  export let title = 'Treasury';
+  let { title = 'Treasury', children }: { title?: string; children: Snippet } = $props();
 
-  let currentUser: any = null;
-  user.subscribe(value => currentUser = value);
+  const currentUser = $derived($user);
 
-  $: isParent = currentUser?.role === 'PARENT';
+  const isParent = $derived(currentUser?.role === 'PARENT');
 </script>
 
-<div class="min-h-screen bg-gray-50">
-  <nav class="bg-white shadow-sm border-b">
+<div class="min-h-screen bg-surface-300">
+  <nav class="glass shadow-elevation-2">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16">
         <div class="flex items-center space-x-6">
-          <a href="/" class="text-xl font-semibold">{title}</a>
+          <a href="/" class="headline-small text-primary-600">{title}</a>
           
           {#if currentUser}
-            <div class="hidden md:flex space-x-4">
+            <div class="hidden md:flex space-x-2">
               <a 
                 href="/" 
-                class={`px-3 py-2 rounded-md text-sm font-medium ${$page.url.pathname === '/' ? 'bg-blue-100 text-blue-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                class={`px-4 py-2 rounded-xl label-large transition-all duration-200 ${$page.url.pathname === '/' ? 'bg-primary-100 text-primary-700' : 'text-on-surface-variant hover:bg-surface-variant'}`}
               >
                 Dashboard
               </a>
@@ -29,16 +29,16 @@
               {#if isParent}
                 <a 
                   href="/manage" 
-                  class={`px-3 py-2 rounded-md text-sm font-medium ${$page.url.pathname === '/manage' ? 'bg-blue-100 text-blue-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                  class={`px-4 py-2 rounded-xl label-large transition-all duration-200 ${$page.url.pathname === '/manage' ? 'bg-primary-100 text-primary-700' : 'text-on-surface-variant hover:bg-surface-variant'}`}
                 >
-                  Manage Transactions
+                  Manage
                 </a>
                 
                 <a 
                   href="/config" 
-                  class={`px-3 py-2 rounded-md text-sm font-medium ${$page.url.pathname === '/config' ? 'bg-blue-100 text-blue-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                  class={`px-4 py-2 rounded-xl label-large transition-all duration-200 ${$page.url.pathname === '/config' ? 'bg-primary-100 text-primary-700' : 'text-on-surface-variant hover:bg-surface-variant'}`}
                 >
-                  Configuration
+                  Config
                 </a>
               {/if}
             </div>
@@ -47,12 +47,12 @@
         
         {#if currentUser}
           <div class="flex items-center space-x-4">
-            <span class="text-sm text-gray-700">
+            <span class="body-medium text-on-surface-variant">
               {currentUser.name} ({currentUser.role})
             </span>
             <button
-              on:click={logout}
-              class="text-sm text-red-600 hover:text-red-800"
+              onclick={logout}
+              class="btn-text text-error-600 hover:bg-error-50"
             >
               Logout
             </button>
@@ -64,11 +64,11 @@
   
   <!-- Mobile navigation -->
   {#if currentUser}
-    <div class="md:hidden bg-white shadow-sm border-b">
+    <div class="md:hidden bg-surface-50 shadow-elevation-1">
       <div class="flex justify-around">
         <a 
           href="/" 
-          class={`flex-1 text-center py-3 text-sm font-medium ${$page.url.pathname === '/' ? 'text-blue-800 border-b-2 border-blue-500' : 'text-gray-700'}`}
+          class={`flex-1 text-center py-3 label-large transition-all duration-200 ${$page.url.pathname === '/' ? 'text-primary-700 border-b-2 border-primary-500' : 'text-on-surface-variant'}`}
         >
           Dashboard
         </a>
@@ -76,14 +76,14 @@
         {#if isParent}
           <a 
             href="/manage" 
-            class={`flex-1 text-center py-3 text-sm font-medium ${$page.url.pathname === '/manage' ? 'text-blue-800 border-b-2 border-blue-500' : 'text-gray-700'}`}
+            class={`flex-1 text-center py-3 label-large transition-all duration-200 ${$page.url.pathname === '/manage' ? 'text-primary-700 border-b-2 border-primary-500' : 'text-on-surface-variant'}`}
           >
             Manage
           </a>
           
           <a 
             href="/config" 
-            class={`flex-1 text-center py-3 text-sm font-medium ${$page.url.pathname === '/config' ? 'text-blue-800 border-b-2 border-blue-500' : 'text-gray-700'}`}
+            class={`flex-1 text-center py-3 label-large transition-all duration-200 ${$page.url.pathname === '/config' ? 'text-primary-700 border-b-2 border-primary-500' : 'text-on-surface-variant'}`}
           >
             Config
           </a>
@@ -93,6 +93,6 @@
   {/if}
   
   <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-    <slot />
+    {@render children()}
   </main>
 </div>

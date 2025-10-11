@@ -28,36 +28,6 @@ const ActivityCategory = {
 };
 
 async function main() {
-  // Create default users
-  const pin = '1234';
-  const pinHash = await bcrypt.hash(pin, 10);
-  
-  await prisma.user.upsert({
-    where: { id: 'parent-default' },
-    update: { pinHash },
-    create: { 
-      id: 'parent-default',
-      name: 'Parent', 
-      role: Role.PARENT, 
-      pinHash,
-      currentBalance: 0
-    },
-  });
-  
-  await prisma.user.upsert({
-    where: { id: 'child-default' },
-    update: { pinHash },
-    create: { 
-      id: 'child-default',
-      name: 'Child', 
-      role: Role.CHILD, 
-      pinHash,
-      currentBalance: 480 // Starting capital
-    },
-  });
-  
-  console.log('Default users created with PIN 1234');
-
   // Create initial configuration
   await prisma.config.upsert({
     where: { id: 'default-config' },

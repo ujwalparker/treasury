@@ -46,7 +46,7 @@ A digital banking system for families to teach children financial responsibility
 
 2. **Install dependencies**
    ```bash
-   npm install
+   yarn install
    ```
 
 3. **Environment Setup**
@@ -62,7 +62,7 @@ A digital banking system for families to teach children financial responsibility
 
 5. **Start Development Server**
    ```bash
-   npm run dev
+   yarn dev
    ```
 
 6. **Access Application**
@@ -180,7 +180,7 @@ If you prefer to configure services manually:
    - Click on "New" and select "Web Service"
    - Connect your repository
    - Name: treasury
-   - Build Command: `npm install && npx prisma generate && npm run build`
+   - Build Command: `yarn install && npx prisma generate && yarn build`
    - Start Command: `npx prisma db push && npx prisma db seed && node build`
    - Plan: Free
    - Add the following environment variables:
@@ -192,7 +192,7 @@ If you prefer to configure services manually:
 
 After successful deployment:
 
-1. The application should be available at your Render URL (e.g., `https://treasury.onrender.com`)
+1. The application should be available at your Render URL (e.g., `https://treasury-rhi2.onrender.com`)
 2. Default login credentials:
    - Parent: PIN 1234
    - Child: PIN 1234

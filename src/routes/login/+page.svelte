@@ -1,209 +1,65 @@
-<script lang="ts">
-  import { goto } from '$app/navigation';
-  import { login } from '$lib/stores/auth';
-  import { api } from '$lib/services/api';
-  import PinInput from '$lib/components/PinInput.svelte';
-  import { onMount } from 'svelte';
-
-  let name = '';
-  let role = 'CHILD';
-  let pin = '';
-  let error = '';
+<script>
+  import { signIn } from '@auth/sveltekit/client';
+  import { page } from '$app/stores';
+  
+  $: isSignup = $page.url.searchParams.get('mode') === 'signup';
   let loading = false;
-  let biometricSupported = false;
-  let biometricRegistered = false;
-  let showBiometricButton = false;
-
-  onMount(() => {
-    checkBiometricSupport();
-  });
-
-  async function checkBiometricSupport() {
-    try {
-      // Check if the browser supports WebAuthn
-      if (window.PublicKeyCredential && 
-          PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
-        
-        // Check if a platform authenticator is available (TouchID, FaceID, Windows Hello)
-        const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-        biometricSupported = available;
-        showBiometricButton = biometricSupported && name;
-      }
-    } catch (err) {
-      console.error('Error checking WebAuthn support:', err);
-      biometricSupported = false;
-    }
-  }
-
-  async function handlePinLogin() {
-    if (!/^\d{4}$/.test(pin)) {
-      error = 'PIN must be exactly 4 digits';
-      return;
-    }
-
+  
+  async function handleGoogleAuth() {
     loading = true;
-    error = '';
-
     try {
-      const data = await api.login(name, role, pin);
-      
-      login(data.token, {
-        id: data.userId,
-        name: data.name,
-        role: data.role,
-        currentBalance: data.currentBalance
-      });
-
-      goto('/');
-    } catch (err: any) {
-      error = err.message;
-    } finally {
+      const callbackUrl = isSignup ? '/setup' : '/';
+      await signIn('google', { callbackUrl });
+    } catch (error) {
+      console.error('Auth error:', error);
       loading = false;
     }
-  }
-
-  async function handleBiometricLogin() {
-    if (!name) {
-      error = 'Please enter your name';
-      return;
-    }
-
-    loading = true;
-    error = '';
-
-    try {
-      // Get credential options from the server
-      const credentialOptions = await api.getCredentialOptions(name);
-      
-      // Convert base64 challenge to ArrayBuffer
-      const challenge = Uint8Array.from(atob(credentialOptions.challenge), c => c.charCodeAt(0));
-      
-      // Create the credential
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          ...credentialOptions,
-          challenge,
-          user: {
-            ...credentialOptions.user,
-            id: Uint8Array.from(credentialOptions.user.id, c => c.charCodeAt(0))
-          },
-          excludeCredentials: credentialOptions.excludeCredentials?.map(cred => ({
-            ...cred,
-            id: Uint8Array.from(atob(cred.id), c => c.charCodeAt(0))
-          }))
-        }
-      });
-      
-      if (credential) {
-        // Convert the credential to JSON
-        const credentialJSON = {
-          id: credential.id,
-          rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-          type: credential.type,
-          response: {
-            attestationObject: btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject))),
-            clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON)))
-          },
-          username: name
-        };
-        
-        // Verify the credential with the server
-        const data = await api.verifyCredential(credentialJSON);
-        
-        login(data.token, {
-          id: data.userId,
-          name: data.name,
-          role: data.role,
-          currentBalance: data.currentBalance
-        });
-
-        goto('/');
-      }
-    } catch (err: any) {
-      console.error('Biometric login error:', err);
-      error = 'Biometric authentication failed. Please try again or use PIN.';
-    } finally {
-      loading = false;
-    }
-  }
-
-  function updateName(event) {
-    name = event.target.value;
-    showBiometricButton = biometricSupported && name;
   }
 </script>
 
-<div class="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-  <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6">
-    <h1 class="text-2xl font-bold text-center mb-6">Family Bank</h1>
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+  <div class="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8">
+    <div class="flex justify-center mb-8">
+      <img src="/logo-vertical.svg" alt="Treasury" class="h-32" />
+    </div>
     
-    {#if error}
-      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-        {error}
+    {#if isSignup}
+      <div class="text-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">Create Account</h1>
+        <p class="text-gray-600 text-sm">Set up your family treasury</p>
+      </div>
+    {:else}
+      <div class="text-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">Welcome</h1>
       </div>
     {/if}
     
-    <form on:submit|preventDefault={handlePinLogin} class="space-y-6">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-        <input
-          type="text"
-          value={name}
-          on:input={updateName}
-          required
-          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Enter your name"
-        />
-      </div>
-      
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-        <select 
-          bind:value={role}
-          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="CHILD">Child</option>
-          <option value="PARENT">Parent</option>
-        </select>
-      </div>
-      
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">4-Digit PIN</label>
-        <PinInput bind:pin />
-      </div>
-      
-      <button 
-        type="submit" 
-        disabled={loading || pin.length !== 4}
-        class="w-full py-2 px-4 rounded-md text-white font-medium {loading || pin.length !== 4 ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}"
-      >
-        {loading ? 'Logging in...' : 'Login with PIN'}
-      </button>
-
-      {#if showBiometricButton}
-        <div class="relative">
-          <div class="absolute inset-0 flex items-center">
-            <div class="w-full border-t border-gray-300"></div>
-          </div>
-          <div class="relative flex justify-center text-sm">
-            <span class="px-2 bg-white text-gray-500">OR</span>
-          </div>
-        </div>
-        
-        <button 
-          type="button"
-          on:click={handleBiometricLogin}
-          disabled={loading || !name}
-          class="w-full py-2 px-4 border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex justify-center items-center space-x-2"
-        >
-          <span class="material-icons text-lg">fingerprint</span>
-          <span>Login with Biometrics</span>
-        </button>
-
-        <p class="text-xs text-center text-gray-500 mt-2">
-          Use your device's fingerprint or face recognition
-        </p>
+    <button 
+      type="button"
+      on:click={handleGoogleAuth}
+      disabled={loading}
+      class="w-full bg-white border border-gray-300 rounded-full py-3 px-6 flex items-center justify-center space-x-3 hover:bg-gray-50 transition-colors disabled:opacity-50 mb-6"
+    >
+      {#if loading}
+        <div class="w-5 h-5 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
+        <span class="text-gray-700 font-medium">Signing in...</span>
+      {:else}
+        <svg class="w-5 h-5" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        <span class="text-gray-700 font-medium">Continue with Google</span>
       {/if}
-    </form>
+    </button>
+    
+    <div class="text-center">
+      {#if isSignup}
+        <a href="/login" class="text-blue-600 hover:text-blue-700 text-sm font-medium">Already have an account? Sign In</a>
+      {:else}
+        <a href="/login?mode=signup" class="text-blue-600 hover:text-blue-700 text-sm font-medium">New to Treasury? Sign Up</a>
+      {/if}
+    </div>
   </div>
 </div>
