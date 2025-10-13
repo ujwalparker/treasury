@@ -28,21 +28,6 @@ const ActivityCategory = {
 };
 
 async function main() {
-  // Create initial configuration
-  await prisma.config.upsert({
-    where: { id: 'default-config' },
-    update: {},
-    create: {
-      id: 'default-config',
-      rupeeCoinValue: 10,
-      twoRupeeCoinValue: 20,
-      paisa50Value: 5,
-      paisa25Value: 2,
-      interestRate: 10,
-      startingCapital: 480,
-    }
-  });
-
   // Create predefined activities
   // Daily Discipline activities
   await createActivity('Making bed in the morning', 'Daily discipline task', TransactionType.CREDIT, 2, ActivityCategory.DAILY_DISCIPLINE);

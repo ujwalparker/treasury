@@ -68,11 +68,15 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 # Yarn PnP
-.pnp.*
 .yarn/*
+!.yarn/cache
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# PnP files (keep these)
+.pnp.*
+
 .env

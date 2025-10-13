@@ -57,11 +57,11 @@ class ApiClient {
 
   // Config
   async getConfig() {
-    return this.request('/config');
+    return this.request('/family/config');
   }
 
   async updateConfig(configData: any) {
-    return this.request('/config', {
+    return this.request('/family/config', {
       method: 'PUT',
       body: JSON.stringify(configData)
     });

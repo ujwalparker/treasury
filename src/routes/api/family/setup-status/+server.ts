@@ -11,37 +11,20 @@ export async function GET({ locals }) {
   try {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { 
-        family: {
-          include: {
-            users: {
-              where: { roles: { has: 'CHILD' } }
-            }
-          }
-        }
-      }
+      include: { family: true }
     });
 
     if (!user) {
       return json({ setupComplete: false });
     }
 
-    // Only check setup for parents
     const isParent = user.roles.includes('PARENT');
     if (!isParent) {
-      return json({ setupComplete: true }); // Children don't need setup
+      return json({ setupComplete: true });
     }
 
-    // Check if setup is complete:
-    // 1. User has a PIN configured
-    // 2. Family exists
-    // 3. At least one child exists
-    const hasPIN = !!user.pinHash;
-    const hasFamily = !!user.family;
-    const hasChildren = user.family?.users?.length > 0;
-
     return json({ 
-      setupComplete: hasPIN && hasFamily && hasChildren
+      setupComplete: user.family?.setupComplete ?? false
     });
   } catch (error) {
     console.error('Setup status check error:', error);

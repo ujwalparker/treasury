@@ -1,14 +1,14 @@
 <script>
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { Menu, ChevronDown, Users, Rocket, X, Key } from 'lucide-svelte';
+  import { Menu, ChevronDown, Users, Rocket, X, Key, Calendar } from 'lucide-svelte';
   import { onMount } from 'svelte';
   import { createProgress } from '@melt-ui/svelte';
-  import { PinInput } from 'melt/builders';
+  import { PinInput, RadioGroup } from 'melt/builders';
   
-  let expandedChild = $state(0);
+  let expandedChild = $state(-1);
   let menuOpen = $state(false);
-  let familyInterests = $state([]);
+  let familyInterests = $state(/** @type {string[]} */ ([]));
   let currentInterest = $state('');
   
   function toggleMenu() {
@@ -46,25 +46,22 @@
           currentStep = Math.max(currentStep, 2);
         }
         
-        // Step 2: Interests
-        if (family?.interests) {
-          familyInterests = family.interests;
+        // Step 2: Family details
+        if (family?.name) {
+          familyName = family.name;
+          familyInterests = family.interests || [];
           currentStep = Math.max(currentStep, 3);
         }
         
-        // Step 3: Family details
-        if (family?.name) {
-          familyName = family.name;
-          currentStep = Math.max(currentStep, 4);
-        }
-        
-        // Step 4: PIN (skip if already set)
+        // Step 3: PIN (skip if already set)
         if (family?.name && user?.pinHash) {
           parentPinAlreadySet = true;
-          currentStep = Math.max(currentStep, 5);
+          if (!family?.users?.some(u => u.roles.includes('CHILD'))) {
+          currentStep = Math.max(currentStep, 4);
+        }
         }
         
-        // Step 5: Children
+        // Step 4: Children
         if (family?.users?.length > 0) {
           const childUsers = family.users.filter(u => u.roles.includes('CHILD'));
           if (childUsers.length > 0) {
@@ -73,9 +70,16 @@
               name: child.name,
               email: child.email || '',
               pin: '',
+              yearOfBirth: child.yearOfBirth || '',
               pinAlreadySet: !!child.pinHash,
               saved: !!child.pinHash
             }));
+            
+            // If all children are saved and have year of birth, skip to config step
+            const allChildrenComplete = children.every(c => c.saved && c.yearOfBirth);
+            if (allChildrenComplete) {
+              currentStep = Math.max(currentStep, 5);
+            }
           }
         }
       }
@@ -87,15 +91,22 @@
   }
   
   let currentStep = $state(1);
-  let selectedTheme = $state(null);
+  let selectedTheme = $state(/** @type {any} */ (null));
   let familyName = $state('');
-  let suggestedNames = $state([]);
+  let suggestedNames = $state(/** @type {string[]} */ ([]));
   let selectedSuggestion = $state(null);
   let customName = $state(false);
   let loadingNames = $state(false);
   let loadingStep = $state(false);
   let initialLoading = $state(true);
-  let children = $state([{ name: '', email: '', pin: '', pinAlreadySet: false, saved: false }]);
+  let isOffline = $state(false);
+  
+  onMount(() => {
+    isOffline = !navigator.onLine;
+    window.addEventListener('online', () => isOffline = false);
+    window.addEventListener('offline', () => isOffline = true);
+  });
+  let children = $state([{ id: undefined, name: '', email: '', pin: '', yearOfBirth: '', pinAlreadySet: false, saved: false }]);
   let parentPin = $state('');
   let parentPinAlreadySet = $state(false);
   
@@ -103,16 +114,18 @@
   
   const parentPinInput = new PinInput();
   
+  const nameGroup = new RadioGroup({ value: undefined });
+  
   $effect(() => {
-    parentPin = parentPinInput.value ? parentPinInput.value.join('') : '';
+    parentPin = Array.isArray(parentPinInput.value) ? parentPinInput.value.join('') : (parentPinInput.value || '');
   });
   
   let isValidParentPin = $derived(parentPinAlreadySet || (parentPin.length === 4 && /^\d{4}$/.test(parentPin)));
   
-  let childPinEditing = $state({});
-  let savingChild = $state({});
+  let childPinEditing = $state(/** @type {Record<number, boolean>} */ ({}));
+  let savingChild = $state(/** @type {Record<number, boolean>} */ ({}));
   
-  async function enablePinEdit(index) {
+  async function enablePinEdit(/** @type {number} */ index) {
     childPinEditing[index] = true;
     children[index].pin = '';
     children[index].pinAlreadySet = false;
@@ -144,7 +157,7 @@
     { id: 'eagle', name: 'Eagle Family', emoji: '🦅', childTerm: 'Eaglet', colors: { primary: '#92400E', secondary: '#FDE68A' } }
   ];
   
-  function selectTheme(theme) {
+  function selectTheme(/** @type {any} */ theme) {
     selectedTheme = theme;
     // Only reset suggestions if theme actually changed
     if (selectedTheme?.id !== theme.id) {
@@ -158,42 +171,37 @@
   async function nextStep() {
     if (currentStep === 1 && selectedTheme) {
       currentStep++;
-    } else if (currentStep === 2 && familyInterests.length >= 2) {
-      loadingStep = true;
-      await saveTags();
-      loadingStep = false;
-      currentStep++;
-    } else if (currentStep === 3 && familyName) {
+    } else if (currentStep === 2 && (familyName || selectedSuggestion)) {
+      if (selectedSuggestion) familyName = selectedSuggestion;
       loadingStep = true;
       await saveFamilyName();
       loadingStep = false;
       currentStep++;
-    } else if (currentStep === 4 && (parentPinAlreadySet || parentPin)) {
+    } else if (currentStep === 3 && (parentPinAlreadySet || parentPin)) {
       loadingStep = true;
       await saveParentPin();
       loadingStep = false;
       currentStep++;
-    } else if (currentStep === 5 && allChildrenSaved) {
+    } else if (currentStep === 4 && allChildrenSaved) {
+      if (isOffline) return;
+      loadingStep = true;
+      try {
+        await savePendingChildren();
+        currentStep++;
+      } catch (error) {
+        console.error('Failed to save children:', error);
+      } finally {
+        loadingStep = false;
+      }
+    } else if (currentStep === 5) {
+      if (isOffline) return;
+      loadingStep = true;
+      await saveConfig();
+      loadingStep = false;
       currentStep++;
     }
   }
   
-  async function saveTags() {
-    try {
-      await fetch('/api/family', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'create_family',
-          familyName: familyName || '',
-          theme: selectedTheme,
-          interests: familyInterests
-        })
-      });
-    } catch (error) {
-      console.error('Failed to save interests:', error);
-    }
-  }
   
   async function saveFamilyName() {
     try {
@@ -226,26 +234,33 @@
       if (response.ok) {
         const data = await response.json();
         suggestedNames = data.names;
-        if (suggestedNames.length > 0) {
-          selectedSuggestion = suggestedNames[0];
-          familyName = selectedSuggestion;
-        }
+        selectedSuggestion = null;
+        familyName = '';
       }
     } catch (error) {
       console.error('Name generation failed:', error);
       suggestedNames = [`The ${selectedTheme.name}`, `${selectedTheme.name} Family`];
-      selectedSuggestion = suggestedNames[0];
-      familyName = selectedSuggestion;
+      selectedSuggestion = null;
+      familyName = '';
     } finally {
       loadingNames = false;
     }
   }
   
-  function selectSuggestion(name) {
-    selectedSuggestion = name;
-    familyName = name;
-    customName = false;
-  }
+  
+  $effect(() => {
+    if (nameGroup.value && suggestedNames.includes(nameGroup.value)) {
+      selectedSuggestion = nameGroup.value || null;
+      customName = false;
+    }
+  });
+  
+  $effect(() => {
+    if (suggestedNames.length > 0) {
+      nameGroup.value = undefined;
+      selectedSuggestion = null;
+    }
+  });
   
   function enableCustomName() {
     customName = true;
@@ -275,7 +290,7 @@
   
   async function saveChild(index) {
     const child = children[index];
-    if (child.name && child.pin && child.pin.length === 4) {
+    if (child.name && child.pin && child.pin.length === 4 && child.yearOfBirth) {
       savingChild[index] = true;
       try {
         const { pinAlreadySet, saved, ...childData } = child;
@@ -285,9 +300,10 @@
           body: JSON.stringify({ action: 'create_child', ...childData })
         });
         children[index].saved = true;
+        childPinEditing[index] = false;
         
         // Find next unsaved child and expand it
-        const nextUnsaved = children.findIndex((c, i) => i > index && !c.saved);
+        const nextUnsaved = children.findIndex((c, i) => i > index && (!c.saved && !c.pinAlreadySet));
         expandedChild = nextUnsaved !== -1 ? nextUnsaved : -1;
       } catch (error) {
         console.error('Failed to save child:', error);
@@ -297,19 +313,72 @@
     }
   }
   
+  async function savePendingChildren() {
+    try {
+      await fetch('/api/family', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          action: 'save_family_children',
+          children: children.filter(c => c.name).map(c => ({
+            id: c.id,
+            name: c.name,
+            email: c.email,
+            yearOfBirth: c.yearOfBirth
+          }))
+        })
+      });
+    } catch (error) {
+      console.error('Failed to save family children:', error);
+    }
+  }
+  
   let allChildrenSaved = $derived(
-    children.filter(c => c.name).every(c => c.saved || (c.pinAlreadySet && !c.pin))
+    children.every(c => !c.name || ((c.saved || c.pinAlreadySet) && c.yearOfBirth)) &&
+    !Object.values(childPinEditing).some(editing => editing)
   );
   
+  let config = $state({
+    rupeeCoinValue: 10,
+    twoRupeeCoinValue: 20,
+    paisa50Value: 5,
+    paisa25Value: 2,
+    interestRate: 10,
+    startingCapital: 480
+  });
+  
+  async function saveConfig() {
+    try {
+      await fetch('/api/family/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+    } catch (error) {
+      console.error('Failed to save config:', error);
+    }
+  }
+  
   async function createFamily() {
-    goto('/config');
+    loadingStep = true;
+    await saveConfig();
+    loadingStep = false;
+    goto('/pin-login');
   }
   
   function addChild() {
     if (children.length < 5) {
-      children = [...children, { name: '', email: '', pin: '', pinAlreadySet: false, saved: false }];
+      children = [...children, { id: undefined, name: '', email: '', pin: '', yearOfBirth: '', pinAlreadySet: false, saved: false }];
+      expandedChild = children.length - 1;
     }
   }
+  
+  $effect(() => {
+    if (currentStep === 4) {
+      const firstUnsaved = children.findIndex(c => (!c.saved && !c.pinAlreadySet) || !c.yearOfBirth);
+      expandedChild = firstUnsaved !== -1 ? firstUnsaved : -1;
+    }
+  });
   
   async function removeChild(index) {
     if (children.length > 1) {
@@ -342,15 +411,24 @@
   }
   
   function addInterest() {
-    if (currentInterest.trim() && familyInterests.length < 8 && !familyInterests.includes(currentInterest.trim())) {
+    if (currentInterest.trim() && familyInterests.length < 5 && !familyInterests.includes(currentInterest.trim())) {
       familyInterests = [...familyInterests, currentInterest.trim()];
       currentInterest = '';
     }
   }
   
-  function removeInterest(index) {
+  function removeInterest(/** @type {number} */ index) {
     familyInterests = familyInterests.filter((_, i) => i !== index);
   }
+  
+  function getChildAge(/** @type {string} */ yearOfBirth) {
+    if (!yearOfBirth) return null;
+    return new Date().getFullYear() - parseInt(yearOfBirth);
+  }
+  
+  const yearOptions = Array.from({length: 13}, (_, i) => new Date().getFullYear() - i);
+  
+
   
 
   
@@ -418,11 +496,11 @@
         </div>
         <div class="flex justify-between mt-2 text-xs text-gray-500">
           <span>Theme</span>
-          <span>Interest</span>
           <span>Name</span>
           <span>PIN</span>
           <span>Children</span>
-          <span>Summary</span>
+          <span>Config</span>
+          <span>Done</span>
         </div>
       </div>
     </div>
@@ -460,97 +538,15 @@
         </button>
         
       {:else if currentStep === 2}
-        <!-- Step 2: Family Tags -->
-        <div class="text-center mb-6">
-          <h2 class="text-xl font-semibold text-gray-900 mb-2">Family Interests</h2>
-        </div>
-        
-        <div class="{loadingStep ? 'opacity-50 pointer-events-none' : ''}">
-          <label for="family-tag" class="block text-sm font-medium text-gray-700 mb-2">Add Interests</label>
-          <div class="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent min-h-[3rem] items-center">
-            {#each familyInterests as interest, i}
-              <div class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
-                {interest}
-                <button 
-                  type="button"
-                  onclick={() => removeInterest(i)}
-                  class="ml-2 text-blue-600 hover:text-blue-800"
-                >
-                  ×
-                </button>
-              </div>
-            {/each}
-            <input 
-              bind:value={currentInterest}
-              onkeydown={(e) => {
-                if (e.key === 'Enter' && currentInterest.trim()) {
-                  addInterest();
-                }
-              }}
-              placeholder="Enter a tag and press Enter"
-              class="flex-1 outline-none bg-transparent min-w-[200px]"
-            />
-          </div>
-          <p class="text-xs text-gray-500 mt-2">Add at least 2 tags that represent your family. These will help generate personalized names.</p>
-        </div>
-        
-        <div class="flex space-x-3">
-          <button 
-            onclick={prevStep}
-            disabled={loadingStep}
-            class="flex-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-700 font-semibold py-4 px-6 rounded-2xl transition-colors"
-          >
-            Back
-          </button>
-          <button 
-            onclick={nextStep}
-            disabled={familyInterests.length < 2 || loadingStep}
-            class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center"
-          >
-            {#if loadingStep}
-              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            {/if}
-            Continue
-          </button>
-        </div>
-        
-      {:else if currentStep === 3}
-        <!-- Step 3: Family Details -->
+        <!-- Step 2: Family Name -->
         <div class="text-center mb-6">
           <h2 class="text-xl font-semibold text-gray-900 mb-2">Family Name</h2>
-          <p class="text-sm text-gray-600">Set up your family name and parent access</p>
+          <p class="text-sm text-gray-600">Set a custom name or generate one</p>
         </div>
         
         <div class="{loadingStep ? 'opacity-50 pointer-events-none' : ''}">
-          <label for="family-name" class="block text-sm font-medium text-gray-700 mb-2">Family Name</label>
           
-          {#if loadingNames}
-            <div class="flex flex-col items-center py-8">
-              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
-              <p class="text-gray-500">Generating family names...</p>
-            </div>
-          {:else if suggestedNames.length > 0}
-            <div class="space-y-3 mb-4">
-              {#each suggestedNames as name}
-                <button
-                  onclick={() => selectSuggestion(name)}
-                  class="w-full p-3 text-left border-2 rounded-xl transition-all
-                    {selectedSuggestion === name 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 hover:border-gray-300'}"
-                >
-                  {name}
-                </button>
-              {/each}
-            </div>
-            
-            <button
-              onclick={enableCustomName}
-              class="w-full py-2 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors"
-            >
-              Use custom name instead
-            </button>
-          {:else if customName || familyName}
+          {#if customName || familyName}
             <input 
               id="family-name"
               bind:value={familyName} 
@@ -565,26 +561,83 @@
             />
             
             <button
-              onclick={() => generateFamilyNames()}
+              onclick={() => { customName = false; familyName = ''; suggestedNames = []; }}
               class="w-full py-2 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors mt-3"
             >
-              Generate Names Instead
+              Generate Name Instead
             </button>
-          {:else}
-            <div class="flex space-x-3">
+          {:else if loadingNames}
+            <div class="flex flex-col items-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+              <p class="text-gray-500">Generating family names...</p>
+            </div>
+          {:else if familyInterests.length >= 2 && suggestedNames.length > 0}
+            <div {...nameGroup.root} class="space-y-3 mb-4">
+              {#each suggestedNames as name}
+                {@const item = nameGroup.getItem(name)}
+                <div {...item.attrs} class="flex items-center p-3 border-2 rounded-xl cursor-pointer
+                  {item.checked ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}">
+                  <div class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center
+                    {item.checked ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}">
+                    {#if item.checked}●{/if}
+                  </div>
+                  <span>{name}</span>
+                </div>
+              {/each}
+              <input {...nameGroup.hiddenInput} />
+            </div>
+            
+            <button
+              onclick={enableCustomName}
+              class="w-full py-2 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors"
+            >
+              Use custom name instead
+            </button>
+          {:else if !selectedSuggestion && suggestedNames.length === 0}
+            <div class="mb-4">
+              <div class="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-2xl focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent min-h-[3rem] items-center">
+                {#each familyInterests as interest, i}
+                  <div class="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+                    {interest}
+                    <button 
+                      type="button"
+                      onclick={() => removeInterest(i)}
+                      class="ml-2 text-blue-600 hover:text-blue-800"
+                    >
+                      ×
+                    </button>
+                  </div>
+                {/each}
+                <input 
+                  bind:value={currentInterest}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter' && currentInterest.trim()) {
+                      addInterest();
+                    }
+                  }}
+                  placeholder="Enter interests and press Enter"
+                  class="flex-1 outline-none bg-transparent min-w-[200px]"
+                />
+              </div>
+              <p class="text-xs text-gray-500 mt-2">Add 2-5 interests to generate personalized names</p>
+            </div>
+            
+            {#if familyInterests.length >= 2}
               <button
                 onclick={() => generateFamilyNames()}
-                class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors"
+                disabled={isOffline}
+                class="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors mb-3"
               >
-                Generate Names
+                {isOffline ? 'Offline' : 'Generate Names'}
               </button>
-              <button
-                onclick={enableCustomName}
-                class="flex-1 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-colors"
-              >
-                Custom Name
-              </button>
-            </div>
+            {/if}
+            
+            <button
+              onclick={enableCustomName}
+              class="w-full py-3 {familyInterests.length >= 2 ? 'border border-gray-300 hover:bg-gray-50 text-gray-700' : 'bg-blue-600 hover:bg-blue-700 text-white'} font-medium rounded-xl transition-colors"
+            >
+              Set Custom Name
+            </button>
           {/if}
         </div>
         
@@ -598,18 +651,18 @@
           </button>
           <button 
             onclick={nextStep}
-            disabled={!familyName || loadingStep}
+            disabled={(!familyName && !selectedSuggestion) || loadingStep || isOffline}
             class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center"
           >
             {#if loadingStep}
               <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
             {/if}
-            Continue
+            {isOffline ? 'Offline' : 'Continue'}
           </button>
         </div>
         
-      {:else if currentStep === 4}
-        <!-- Step 4: Set Parent PIN -->
+      {:else if currentStep === 3}
+        <!-- Step 3: Set Parent PIN -->
         <div class="text-center mb-6">
           <h2 class="text-xl font-semibold text-gray-900 mb-2">{parentPinAlreadySet ? 'Parent PIN Already Set' : 'Set Your Parent PIN'}</h2>
           <p class="text-sm text-gray-600">{parentPinAlreadySet ? 'Your parent PIN is already configured. Click continue to proceed.' : 'Create a secure 4-digit PIN for parent access'}</p>
@@ -637,24 +690,24 @@
           </button>
           <button 
             onclick={nextStep}
-            disabled={!isValidParentPin || loadingStep}
+            disabled={!isValidParentPin || loadingStep || isOffline}
             class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center"
           >
             {#if loadingStep}
               <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
             {/if}
-            Continue
+            {isOffline ? 'Offline' : 'Continue'}
           </button>
         </div>
         
-      {:else if currentStep === 5}
-        <!-- Step 5: Add Children -->
+      {:else if currentStep === 4}
+        <!-- Step 4: Add Children -->
         <div class="text-center mb-6">
           <h2 class="text-xl font-semibold text-gray-900 mb-2">Add {selectedTheme?.childTerm}s</h2>
           <p class="text-sm text-gray-600">Add your {selectedTheme?.childTerm?.toLowerCase()}s to the {selectedTheme?.name}</p>
         </div>
         
-        <div>
+        <div class="{loadingStep ? 'opacity-50 pointer-events-none' : ''}">
           {#each children as child, i}
             <div class="mb-4 border border-gray-200 rounded-2xl overflow-hidden">
               <div class="w-full p-4 bg-gray-50 flex items-center justify-between">
@@ -666,15 +719,26 @@
                     <span class="font-medium text-gray-900">
                       {child.name ? child.name.split(' ')[0] : `${selectedTheme?.childTerm} ${i + 1}`}
                     </span>
-                    {#if child.saved}
-                      <span class="flex items-center gap-1 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                        <Key size={12} />
-                      </span>
-                    {:else}
-                      <span class="flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">
-                        <Key size={12} />
-                      </span>
-                    {/if}
+                    <div class="flex items-center gap-1">
+                      {#if child.saved || child.pinAlreadySet}
+                        <span class="flex items-center gap-1 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                          <Key size={12} />
+                        </span>
+                      {:else}
+                        <span class="flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">
+                          <Key size={12} />
+                        </span>
+                      {/if}
+                      {#if child.yearOfBirth}
+                        <span class="flex items-center gap-1 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                          <Calendar size={12} />
+                        </span>
+                      {:else}
+                        <span class="flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">
+                          <Calendar size={12} />
+                        </span>
+                      {/if}
+                    </div>
                   </div>
                   <ChevronDown size={16} class="{expandedChild === i ? 'rotate-180' : ''} transition-transform" />
                 </button>
@@ -701,6 +765,15 @@
                     type="email"
                     class="w-full px-3 py-2 border border-gray-300 rounded-xl mb-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" 
                   />
+                  <select 
+                    bind:value={child.yearOfBirth} 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-xl mb-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  >
+                    <option value="">Select Year of Birth</option>
+                    {#each yearOptions as year}
+                      <option value={year}>{year}</option>
+                    {/each}
+                  </select>
                   <div class="mb-3">
                     <div class="block text-sm font-medium text-gray-700 mb-2">{selectedTheme?.childTerm}'s 4-digit PIN</div>
                     {#if child.pinAlreadySet && !childPinEditing[i]}
@@ -726,13 +799,13 @@
                   </div>
                   <button
                     onclick={() => saveChild(i)}
-                    disabled={!child.name || !child.pin || child.pin.length !== 4 || savingChild[i]}
+                    disabled={!child.name || !child.pin || child.pin.length !== 4 || !child.yearOfBirth || savingChild[i] || isOffline}
                     class="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors mb-3 flex items-center justify-center"
                   >
                     {#if savingChild[i]}
                       <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
                     {/if}
-                    {child.saved ? 'Update' : 'Save'} {selectedTheme?.childTerm}
+                    {isOffline ? 'Offline' : `${child.saved ? 'Update' : 'Save'} ${selectedTheme?.childTerm}`}
                   </button>
                   <p class="text-xs text-gray-500">If email is provided, {selectedTheme?.childTerm?.toLowerCase()} can use Google login. Otherwise, they'll use the in-app switcher.</p>
                 </div>
@@ -760,19 +833,87 @@
           </button>
           <button 
             onclick={nextStep}
-            disabled={!allChildrenSaved}
-            class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-2xl transition-colors"
+            disabled={!allChildrenSaved || loadingStep || isOffline}
+            class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center"
           >
-            Continue
+            {#if loadingStep}
+              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            {/if}
+            {isOffline ? 'Offline' : 'Continue'}
           </button>
         </div>
         
 
         
+      {:else if currentStep === 5}
+        <!-- Step 5: Configuration -->
+        <div class="text-center mb-6">
+          <h2 class="text-xl font-semibold text-gray-900 mb-2">Treasury Configuration</h2>
+          <p class="text-sm text-gray-600">Configure your family's point system</p>
+        </div>
+        
+        <div class="space-y-6">
+          <div>
+            <h3 class="font-medium text-gray-900 mb-4">Coin Values</h3>
+            <div class="space-y-4">
+              <div>
+                <label for="rupee-coin" class="block text-sm text-gray-700 mb-1">1 Rupee Coin (points)</label>
+                <input id="rupee-coin" bind:value={config.rupeeCoinValue} type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+              </div>
+              <div>
+                <label for="two-rupee-coin" class="block text-sm text-gray-700 mb-1">2 Rupee Coin (points)</label>
+                <input id="two-rupee-coin" bind:value={config.twoRupeeCoinValue} type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+              </div>
+              <div>
+                <label for="paisa-50" class="block text-sm text-gray-700 mb-1">50 Paisa Coin (points)</label>
+                <input id="paisa-50" bind:value={config.paisa50Value} type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+              </div>
+              <div>
+                <label for="paisa-25" class="block text-sm text-gray-700 mb-1">25 Paisa Coin (points)</label>
+                <input id="paisa-25" bind:value={config.paisa25Value} type="number" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <h3 class="font-medium text-gray-900 mb-4">System Settings</h3>
+            <div class="space-y-4">
+              <div>
+                <label for="interest-rate" class="block text-sm text-gray-700 mb-1">Weekly Interest Rate (%)</label>
+                <input id="interest-rate" bind:value={config.interestRate} type="number" min="1" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+              </div>
+              <div>
+                <label for="starting-capital" class="block text-sm text-gray-700 mb-1">Starting Capital (points)</label>
+                <input id="starting-capital" bind:value={config.startingCapital} type="number" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex space-x-3">
+          <button 
+            onclick={prevStep}
+            disabled={loadingStep}
+            class="flex-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-700 font-semibold py-4 px-6 rounded-2xl transition-colors"
+          >
+            Back
+          </button>
+          <button 
+            onclick={nextStep}
+            disabled={loadingStep || isOffline}
+            class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center"
+          >
+            {#if loadingStep}
+              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            {/if}
+            {isOffline ? 'Offline' : 'Continue'}
+          </button>
+        </div>
+        
       {:else if currentStep === 6}
         <!-- Step 6: Summary -->
         <div class="text-center mb-6">
-          <h2 class="text-xl font-semibold text-gray-900 mb-2">Setup Summary</h2>
+          <h2 class="text-xl font-semibold text-gray-900 mb-2">Summary</h2>
           <p class="text-sm text-gray-600">Review your family setup before proceeding</p>
         </div>
         
@@ -831,14 +972,14 @@
           </button>
           <button 
             onclick={createFamily}
-            disabled={loadingStep}
+            disabled={loadingStep || isOffline}
             class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-2xl transition-colors flex items-center justify-center space-x-2"
           >
             {#if loadingStep}
               <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
             {/if}
             <Rocket size={20} />
-            <span>Configure Treasury</span>
+            <span>{isOffline ? 'Offline' : 'Configure Treasury'}</span>
           </button>
         </div>
       {/if}

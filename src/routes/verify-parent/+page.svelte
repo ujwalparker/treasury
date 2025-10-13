@@ -8,8 +8,6 @@
   let loading = true;
   let verifying = false;
   let error = '';
-  let correctAnswers = 0;
-  let totalAttempts = 0;
   
   const {
     elements: { root, item, hiddenInput },
@@ -61,10 +59,6 @@
         return;
       }
       
-      // Update progress
-      correctAnswers = result.correctAnswers;
-      totalAttempts = result.totalAttempts;
-      
       if (result.nextQuestion) {
         currentQuestion = result.nextQuestion;
         value.set(null);
@@ -89,7 +83,7 @@
     <div class="text-center mb-8">
       <img src="/logo-vertical.svg" alt="Treasury" class="h-24 mx-auto mb-4" />
       <h1 class="text-2xl font-bold text-gray-900 mb-2">Parent Verification</h1>
-      <p class="text-gray-600 text-sm">Please answer these questions to verify you're a parent</p>
+      <p class="text-gray-600 text-sm">Answer these questions to verify you're a parent</p>
     </div>
     
     {#if loading}
@@ -99,10 +93,6 @@
       </div>
     {:else if currentQuestion}
       <div class="space-y-6">
-        <div class="text-center">
-          <span class="text-sm text-gray-500">Correct: {correctAnswers}/3 | Attempts: {totalAttempts}/6</span>
-        </div>
-        
         <div class="bg-gray-50 rounded-2xl p-6">
           <p class="text-gray-900 font-medium mb-6">{currentQuestion.question}</p>
           <div use:root class="space-y-3">

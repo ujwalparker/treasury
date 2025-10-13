@@ -21,6 +21,7 @@ model User {
   image             String?
   roles             String[]            @default(["CHILD"]) // Array of roles: "CHILD", "PARENT", "ADMIN"
   pinHash           String?             // bcrypt hash of 4‑digit PIN
+  yearOfBirth       Int?                // Year of birth for age calculation
   currentBalance    Int                 @default(0)
   familyId          String?             // Links to family
   createdAt         DateTime            @default(now())
@@ -134,7 +135,6 @@ model FamilyConfig {
   paisa50Value        Int      @default(5)  // points per 50 Paisa coin
   paisa25Value        Int      @default(2)  // points per 25 Paisa coin
   interestRate        Int      @default(10) // weekly savings bonus percentage
-  startingCapital     Int      @default(480) // initial bank points
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }

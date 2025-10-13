@@ -4,11 +4,13 @@ services:
     env: node
     plan: free
     buildCommand: yarn install && yarn prisma generate && yarn build
-    startCommand: node build/index.js
+    startCommand: yarn prisma db push && yarn prisma db seed && node build/index.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
+        generateValue: true
+      - key: AUTH_SECRET
         generateValue: true
       - key: DATABASE_URL
         fromService:
@@ -30,3 +32,19 @@ services:
           type: web
           name: treasury
           envVarKey: PORT
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_MODELS
+        value: groq/compound-mini
+      - key: GEMINI_MODELS
+        value: gemini-2.5-flash-lite
+      - key: DEFAULT_GROQ_MODEL
+        value: groq/compound-mini
+      - key: DEFAULT_GEMINI_MODEL
+        value: gemini-2.5-flash-lite
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

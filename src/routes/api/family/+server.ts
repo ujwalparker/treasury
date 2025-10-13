@@ -80,7 +80,8 @@ export async function POST({ request, locals }) {
           data: {
             name: data.name,
             email: data.email || undefined,
-            pinHash: await bcrypt.hash(data.pin, 10)
+            pinHash: await bcrypt.hash(data.pin, 10),
+            yearOfBirth: data.yearOfBirth ? parseInt(data.yearOfBirth) : undefined
           }
         });
       } else {
@@ -97,7 +98,8 @@ export async function POST({ request, locals }) {
             familyId: parent.familyId,
             parentId: parent.id,
             pinHash: await bcrypt.hash(data.pin, 10),
-            currentBalance: familyConfig?.startingCapital || 480
+            currentBalance: familyConfig?.startingCapital || 480,
+            yearOfBirth: data.yearOfBirth ? parseInt(data.yearOfBirth) : undefined
           }
         });
       }
@@ -133,6 +135,26 @@ export async function POST({ request, locals }) {
       await prisma.user.delete({
         where: { id: data.childId }
       });
+      
+      return json({ success: true });
+
+    case 'update_child_year':
+      await prisma.user.update({
+        where: { id: data.childId },
+        data: { yearOfBirth: parseInt(data.yearOfBirth) }
+      });
+      
+      return json({ success: true });
+
+    case 'save_family_children':
+      for (const child of data.children) {
+        if (child.id && child.yearOfBirth) {
+          await prisma.user.update({
+            where: { id: child.id },
+            data: { yearOfBirth: parseInt(child.yearOfBirth) }
+          });
+        }
+      }
       
       return json({ success: true });
 

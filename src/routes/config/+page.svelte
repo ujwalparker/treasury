@@ -4,6 +4,7 @@
   import { api } from '$lib/services/api';
   import Layout from '$lib/components/Layout.svelte';
   import { goto } from '$app/navigation';
+  import { Slider } from 'melt/builders';
 
   interface Config {
     rupeeCoinValue: number;
@@ -11,7 +12,6 @@
     paisa50Value: number;
     paisa25Value: number;
     interestRate: number;
-    startingCapital: number;
   }
 
   let config: Config = {
@@ -19,9 +19,20 @@
     twoRupeeCoinValue: 20,
     paisa50Value: 5,
     paisa25Value: 2,
-    interestRate: 10,
-    startingCapital: 480
+    interestRate: 10
   };
+
+  const rupeeCoinSlider = new Slider({ value: 10, min: 1, max: 50, step: 1 });
+  const twoRupeeCoinSlider = new Slider({ value: 20, min: 1, max: 100, step: 1 });
+  const paisa50Slider = new Slider({ value: 5, min: 1, max: 25, step: 1 });
+  const paisa25Slider = new Slider({ value: 2, min: 1, max: 10, step: 1 });
+  const interestRateSlider = new Slider({ value: 10, min: 1, max: 50, step: 1 });
+
+  $: config.rupeeCoinValue = rupeeCoinSlider.value;
+  $: config.twoRupeeCoinValue = twoRupeeCoinSlider.value;
+  $: config.paisa50Value = paisa50Slider.value;
+  $: config.paisa25Value = paisa25Slider.value;
+  $: config.interestRate = interestRateSlider.value;
   
   let loading = true;
   let saving = false;
@@ -34,11 +45,20 @@
   }
 
   onMount(async () => {
+    if (!$user?.roles?.includes('PARENT')) {
+      loading = false;
+      return;
+    }
+    
     try {
       const configData = await api.getConfig();
       config = configData;
-
-      console.log($user)
+      
+      rupeeCoinSlider.value = configData.rupeeCoinValue;
+      twoRupeeCoinSlider.value = configData.twoRupeeCoinValue;
+      paisa50Slider.value = configData.paisa50Value;
+      paisa25Slider.value = configData.paisa25Value;
+      interestRateSlider.value = configData.interestRate;
     } catch (error) {
       errorMessage = 'Error loading configuration';
       console.error('Error fetching configuration:', error);
@@ -55,6 +75,7 @@
     try {
       await api.updateConfig(config);
       successMessage = 'Configuration updated successfully';
+      setTimeout(() => goto('/pin-login'), 1000);
     } catch (error: any) {
       errorMessage = error.message || 'Failed to update configuration';
     } finally {
@@ -95,53 +116,65 @@
               <div>
                 <h3 class="title-large text-on-surface mb-6">Coin Values</h3>
                 
-                <div class="space-y-6">
+                <div class="space-y-8">
                   <div>
-                    <label for="rupeeCoinValue" class="block label-large text-on-surface mb-2">1 Rupee Coin Value (points)</label>
-                    <input
-                      id="rupeeCoinValue"
-                      type="number"
-                      bind:value={config.rupeeCoinValue}
-                      class="input-outlined w-full"
-                      min="1"
-                      required
-                    />
+                    <div class="flex justify-between items-center mb-3">
+                      <label class="label-large text-on-surface">1 Rupee Coin</label>
+                      <span class="title-medium text-primary">{config.rupeeCoinValue} points</span>
+                    </div>
+                    <div {...rupeeCoinSlider.root} class="relative flex items-center w-full h-6">
+                      <div class="h-1 w-full bg-surface-variant rounded-full" />
+                      <div {...rupeeCoinSlider.thumb} class="w-5 h-5 bg-primary rounded-full shadow-md hover:scale-110 transition-transform cursor-pointer" />
+                    </div>
+                    <div class="flex justify-between mt-1">
+                      <span class="body-small text-on-surface-variant">1</span>
+                      <span class="body-small text-on-surface-variant">50</span>
+                    </div>
                   </div>
                   
                   <div>
-                    <label for="twoRupeeCoinValue" class="block label-large text-on-surface mb-2">2 Rupee Coin Value (points)</label>
-                    <input
-                      id="twoRupeeCoinValue"
-                      type="number"
-                      bind:value={config.twoRupeeCoinValue}
-                      class="input-outlined w-full"
-                      min="1"
-                      required
-                    />
+                    <div class="flex justify-between items-center mb-3">
+                      <label class="label-large text-on-surface">2 Rupee Coin</label>
+                      <span class="title-medium text-primary">{config.twoRupeeCoinValue} points</span>
+                    </div>
+                    <div {...twoRupeeCoinSlider.root} class="relative flex items-center w-full h-6">
+                      <div class="h-1 w-full bg-surface-variant rounded-full" />
+                      <div {...twoRupeeCoinSlider.thumb} class="w-5 h-5 bg-primary rounded-full shadow-md hover:scale-110 transition-transform cursor-pointer" />
+                    </div>
+                    <div class="flex justify-between mt-1">
+                      <span class="body-small text-on-surface-variant">1</span>
+                      <span class="body-small text-on-surface-variant">100</span>
+                    </div>
                   </div>
                   
                   <div>
-                    <label for="paisa50Value" class="block label-large text-on-surface mb-2">50 Paisa Coin Value (points)</label>
-                    <input
-                      id="paisa50Value"
-                      type="number"
-                      bind:value={config.paisa50Value}
-                      class="input-outlined w-full"
-                      min="1"
-                      required
-                    />
+                    <div class="flex justify-between items-center mb-3">
+                      <label class="label-large text-on-surface">50 Paisa Coin</label>
+                      <span class="title-medium text-primary">{config.paisa50Value} points</span>
+                    </div>
+                    <div {...paisa50Slider.root} class="relative flex items-center w-full h-6">
+                      <div class="h-1 w-full bg-surface-variant rounded-full" />
+                      <div {...paisa50Slider.thumb} class="w-5 h-5 bg-primary rounded-full shadow-md hover:scale-110 transition-transform cursor-pointer" />
+                    </div>
+                    <div class="flex justify-between mt-1">
+                      <span class="body-small text-on-surface-variant">1</span>
+                      <span class="body-small text-on-surface-variant">25</span>
+                    </div>
                   </div>
                   
                   <div>
-                    <label for="paisa25Value" class="block label-large text-on-surface mb-2">25 Paisa Coin Value (points)</label>
-                    <input
-                      id="paisa25Value"
-                      type="number"
-                      bind:value={config.paisa25Value}
-                      class="input-outlined w-full"
-                      min="1"
-                      required
-                    />
+                    <div class="flex justify-between items-center mb-3">
+                      <label class="label-large text-on-surface">25 Paisa Coin</label>
+                      <span class="title-medium text-primary">{config.paisa25Value} points</span>
+                    </div>
+                    <div {...paisa25Slider.root} class="relative flex items-center w-full h-6">
+                      <div class="h-1 w-full bg-surface-variant rounded-full" />
+                      <div {...paisa25Slider.thumb} class="w-5 h-5 bg-primary rounded-full shadow-md hover:scale-110 transition-transform cursor-pointer" />
+                    </div>
+                    <div class="flex justify-between mt-1">
+                      <span class="body-small text-on-surface-variant">1</span>
+                      <span class="body-small text-on-surface-variant">10</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -149,32 +182,21 @@
               <div>
                 <h3 class="title-large text-on-surface mb-6">System Settings</h3>
                 
-                <div class="space-y-6">
+                <div class="space-y-8">
                   <div>
-                    <label for="interestRate" class="block label-large text-on-surface mb-2">Weekly Interest Rate (%)</label>
-                    <input
-                      id="interestRate"
-                      type="number"
-                      bind:value={config.interestRate}
-                      class="input-outlined w-full"
-                      min="1"
-                      max="100"
-                      required
-                    />
-                    <p class="body-small text-on-surface-variant mt-2">Percentage of savings that will be added as bonus each week</p>
-                  </div>
-                  
-                  <div>
-                    <label for="startingCapital" class="block label-large text-on-surface mb-2">Starting Capital (points)</label>
-                    <input
-                      id="startingCapital"
-                      type="number"
-                      bind:value={config.startingCapital}
-                      class="input-outlined w-full"
-                      min="0"
-                      required
-                    />
-                    <p class="body-small text-on-surface-variant mt-2">Initial points for new users</p>
+                    <div class="flex justify-between items-center mb-3">
+                      <label class="label-large text-on-surface">Weekly Interest Rate</label>
+                      <span class="title-medium text-primary">{config.interestRate}%</span>
+                    </div>
+                    <div {...interestRateSlider.root} class="relative flex items-center w-full h-6">
+                      <div class="h-1 w-full bg-surface-variant rounded-full" />
+                      <div {...interestRateSlider.thumb} class="w-5 h-5 bg-primary rounded-full shadow-md hover:scale-110 transition-transform cursor-pointer" />
+                    </div>
+                    <div class="flex justify-between mt-1">
+                      <span class="body-small text-on-surface-variant">1%</span>
+                      <span class="body-small text-on-surface-variant">50%</span>
+                    </div>
+                    <p class="body-small text-on-surface-variant mt-3">Percentage of savings added as bonus each week</p>
                   </div>
                 </div>
               </div>

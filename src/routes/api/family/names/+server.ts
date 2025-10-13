@@ -5,12 +5,13 @@ export async function POST({ request, locals }) {
   try {
     const session = await locals.auth();
     const fullName = session?.user?.name || 'Family';
+    const { tags, theme } = await request.json();
     
     // Extract surname if available, otherwise use first name
     const nameParts = fullName.split(' ');
     const parentName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
     
-    const names = await generateFamilyNames(parentName);
+    const names = await generateFamilyNames(parentName, tags, theme);
     
     return json({ names });
   } catch (error) {

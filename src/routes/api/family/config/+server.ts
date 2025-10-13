@@ -8,8 +8,7 @@ const DEFAULT_CONFIG = {
   twoRupeeCoinValue: 20,
   paisa50Value: 5,
   paisa25Value: 2,
-  interestRate: 10,
-  startingCapital: 480
+  interestRate: 10
 };
 
 export async function GET({ request, locals }: RequestEvent) {
@@ -95,13 +94,12 @@ export async function PUT({ request, locals }: RequestEvent) {
       twoRupeeCoinValue,
       paisa50Value,
       paisa25Value,
-      interestRate,
-      startingCapital
+      interestRate
     } = await request.json();
 
     // Validate values
     if (rupeeCoinValue < 0 || twoRupeeCoinValue < 0 || paisa50Value < 0 || 
-        paisa25Value < 0 || interestRate < 0 || startingCapital < 0) {
+        paisa25Value < 0 || interestRate < 0) {
       return json({ error: 'All values must be positive numbers' }, { status: 400 });
     }
 
@@ -110,14 +108,19 @@ export async function PUT({ request, locals }: RequestEvent) {
       twoRupeeCoinValue,
       paisa50Value,
       paisa25Value,
-      interestRate,
-      startingCapital
+      interestRate
     };
 
     const updatedConfig = await prisma.familyConfig.upsert({
       where: { familyId },
       update: updateData,
       create: { familyId, ...updateData }
+    });
+
+    // Mark family setup as complete
+    await prisma.family.update({
+      where: { id: familyId },
+      data: { setupComplete: true }
     });
 
     return json(updatedConfig);

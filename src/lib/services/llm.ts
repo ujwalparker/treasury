@@ -78,14 +78,16 @@ async function generateWithGemini(prompt: string, config: LLMConfig): Promise<an
   return JSON.parse(jsonMatch[0]);
 }
 
-export async function generateFamilyNames(parentName: string): Promise<string[]> {
+export async function generateFamilyNames(parentName: string, tags: string[], theme: string): Promise<string[]> {
   const config = await getLLMConfig();
   
   const prompt = `Generate exactly 4 creative family names based on the parent name "${parentName}".
+Family interests: ${tags.join(', ')}
+Family theme: ${theme}
   
   The names should be:
   - Family-friendly and appropriate
-  - Creative variations using the parent's name
+  - Creative variations incorporating the parent's name, interests, and theme
   - Sound like real family names
   - Include different formats (Family, Household, Clan, etc.)
   
