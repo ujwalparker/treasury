@@ -28,19 +28,19 @@
   }
   
   function switchUser() {
-    goto('/switch');
+    goto('/auth/switch');
   }
 
   onMount(async () => {
     // Check Auth.js session
     const res = await fetch('/auth/session');
     if (!res.ok) {
-      goto('/login');
+      goto('/auth/login');
       return;
     }
     const session = await res.json();
     if (!session?.user) {
-      goto('/login');
+      goto('/auth/login');
       return;
     }
     
@@ -49,11 +49,11 @@
     
     // Check if family setup is complete for parents
     try {
-      const setupRes = await fetch('/api/family/setup-status');
+      const setupRes = await fetch('/api/families/me/setup');
       if (setupRes.ok) {
         const setupData = await setupRes.json();
         if (!setupData.setupComplete) {
-          goto('/verify-parent');
+          goto('/families/verify');
           return;
         }
       } else {

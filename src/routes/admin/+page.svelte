@@ -71,19 +71,19 @@
     // Check Auth.js session
     const res = await fetch('/auth/session');
     if (!res.ok) {
-      goto('/login');
+      goto('/auth/login');
       return;
     }
     const session = await res.json();
     if (!session?.user) {
-      goto('/login');
+      goto('/auth/login');
       return;
     }
     
     currentUser = session.user;
     
     // Check if user has ADMIN role
-    const userRes = await fetch('/api/user/profile');
+    const userRes = await fetch('/api/users/me');
     if (userRes.ok) {
       const userData = await userRes.json();
       if (!userData.user?.roles?.includes('ADMIN')) {

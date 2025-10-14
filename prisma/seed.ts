@@ -28,6 +28,44 @@ const ActivityCategory = {
 };
 
 async function main() {
+  // Create default currency template
+  const adminConfig = await prisma.adminConfig.upsert({
+    where: { id: 'default-admin-config' },
+    update: {},
+    create: { id: 'default-admin-config' }
+  });
+
+  const inrTemplate = await prisma.currencyTemplate.upsert({
+    where: { code: 'INR' },
+    update: {},
+    create: {
+      name: 'Indian Rupee',
+      code: 'INR',
+      isDefault: true,
+      adminConfigId: adminConfig.id
+    }
+  });
+
+  const currencyModels = [
+    { name: '25 Paisa Coin', type: 'COIN', value: 2, sortOrder: 1 },
+    { name: '50 Paisa Coin', type: 'COIN', value: 5, sortOrder: 2 },
+    { name: '1 Rupee Coin', type: 'COIN', value: 10, sortOrder: 3 },
+    { name: '2 Rupee Coin', type: 'COIN', value: 20, sortOrder: 4 },
+    { name: '5 Rupee Coin', type: 'COIN', value: 50, sortOrder: 5 },
+    { name: '10 Rupee Note', type: 'NOTE', value: 100, sortOrder: 6 },
+    { name: '20 Rupee Note', type: 'NOTE', value: 200, sortOrder: 7 },
+    { name: '50 Rupee Note', type: 'NOTE', value: 500, sortOrder: 8 },
+    { name: '100 Rupee Note', type: 'NOTE', value: 1000, sortOrder: 9 },
+  ];
+
+  for (const cm of currencyModels) {
+    await prisma.currencyTemplateModel.upsert({
+      where: { id: `${inrTemplate.id}-${cm.name}` },
+      update: cm,
+      create: { id: `${inrTemplate.id}-${cm.name}`, templateId: inrTemplate.id, ...cm }
+    });
+  }
+
   // Create predefined activities
   // Daily Discipline activities
   await createActivity('Making bed in the morning', 'Daily discipline task', TransactionType.CREDIT, 2, ActivityCategory.DAILY_DISCIPLINE);

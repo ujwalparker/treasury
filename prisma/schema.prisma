@@ -24,10 +24,12 @@ model User {
   yearOfBirth       Int?                // Year of birth for age calculation
   currentBalance    Int                 @default(0)
   familyId          String?             // Links to family
+  lastInterestDate  DateTime?           // Last time interest was calculated
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   family            Family?             @relation(fields: [familyId], references: [id])
   transactions      Transaction[]
+  transactionRequests TransactionRequest[]
   webAuthnCredentials WebAuthnCredential[]
   accounts          Account[]
   sessions          Session[]
@@ -37,12 +39,14 @@ model User {
 }
 
 model Family {
-  id            String        @id @default(uuid())
+  id            String            @id @default(uuid())
   name          String
-  theme         String?       // Selected animal theme
-  interests     String[]      @default([]) // Family interests/tags
-  setupComplete Boolean       @default(false)
-  createdAt     DateTime      @default(now())
+  theme         String?           // Selected animal theme
+  interests     String[]          @default([]) // Family interests/tags
+  setupComplete Boolean           @default(false)
+  currencyTemplateId String?
+  currencyTemplate   CurrencyTemplate? @relation(fields: [currencyTemplateId], references: [id])
+  createdAt     DateTime          @default(now())
   users         User[]
   config        FamilyConfig?
 }
@@ -115,28 +119,64 @@ model Activity {
 }
 
 model AdminConfig {
-  id                  String   @id @default(uuid())
-  defaultLlmProvider  String   @default("groq") // "groq" or "gemini"
-  groqApiKey          String?  // Groq API key
-  geminiApiKey        String?  // Gemini API key
-  groqModel           String   @default("groq/compound-mini") // Groq model
-  geminiModel         String   @default("gemini-2.5-flash-lite") // Gemini model
-  verificationKeywords String  @default("legal drinking age, mortgage terms, Social Security, tax filing, credit score, insurance") // Keywords for verification questions
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                  String             @id @default(uuid())
+  defaultLlmProvider  String             @default("groq") // "groq" or "gemini"
+  groqApiKey          String?            // Groq API key
+  geminiApiKey        String?            // Gemini API key
+  groqModel           String             @default("groq/compound-mini") // Groq model
+  geminiModel         String             @default("gemini-2.5-flash-lite") // Gemini model
+  verificationKeywords String            @default("legal drinking age, mortgage terms, Social Security, tax filing, credit score, insurance") // Keywords for verification questions
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  currencyTemplates   CurrencyTemplate[]
+}
+
+model CurrencyTemplate {
+  id          String                    @id @default(uuid())
+  adminConfigId String?
+  adminConfig AdminConfig?              @relation(fields: [adminConfigId], references: [id], onDelete: Cascade)
+  name        String                    // e.g., "Indian Rupee", "US Dollar", "Euro"
+  code        String                    @unique // e.g., "INR", "USD", "EUR"
+  isDefault   Boolean                   @default(false)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  models      CurrencyTemplateModel[]
+  families    Family[]
+}
+
+model CurrencyTemplateModel {
+  id          String           @id @default(uuid())
+  templateId  String
+  template    CurrencyTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name        String           // e.g., "1 Rupee Coin", "10 Rupee Note"
+  type        String           // "COIN" or "NOTE"
+  value       Int              // points value
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 }
 
 model FamilyConfig {
-  id                  String   @id @default(uuid())
-  familyId            String   @unique
-  family              Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  rupeeCoinValue      Int      @default(10) // points per 1 Rupee coin
-  twoRupeeCoinValue   Int      @default(20) // points per 2 Rupee coin
-  paisa50Value        Int      @default(5)  // points per 50 Paisa coin
-  paisa25Value        Int      @default(2)  // points per 25 Paisa coin
-  interestRate        Int      @default(10) // weekly savings bonus percentage
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                  String          @id @default(uuid())
+  familyId            String          @unique
+  family              Family          @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  interestRate        Int             @default(10) // savings bonus percentage
+  interestDuration    Int             @default(7)  // days between interest calculations
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  currencyModels      CurrencyModel[]
+}
+
+model CurrencyModel {
+  id          String        @id @default(uuid())
+  configId    String
+  config      FamilyConfig  @relation(fields: [configId], references: [id], onDelete: Cascade)
+  name        String        // e.g., "1 Rupee Coin", "10 Rupee Note"
+  type        String        // "COIN" or "NOTE"
+  value       Int           // points value
+  sortOrder   Int           @default(0) // for display ordering
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 model SavingsBonus {
@@ -145,4 +185,19 @@ model SavingsBonus {
   amount      Int      // bonus points added
   balance     Int      // balance before bonus
   bonusDate   DateTime @default(now())
+}
+
+model TransactionRequest {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // TransactionType
+  amount      Int
+  activity    String
+  category    String
+  status      String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

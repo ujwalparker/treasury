@@ -1,0 +1,68 @@
+# Automatic Interest Calculation Setup
+
+## Overview
+Interest is calculated automatically based on each family's `interestRate` and `interestDuration` settings.
+
+## How It Works
+1. Each child user has a `lastInterestDate` field
+2. Cron job runs daily to check if `interestDuration` days have passed
+3. If eligible, calculates interest: `(currentBalance * interestRate) / 100`
+4. Creates INTEREST transaction and updates balance
+5. Records in SavingsBonus table for history
+
+## Setup Options
+
+### Option 1: Render Cron Jobs (Recommended for Production)
+Add to `render.yaml`:
+```yaml
+- type: cron
+  name: interest-calculator
+  schedule: "0 0 * * *"  # Daily at midnight
+  command: "curl -X POST https://your-app.onrender.com/api/cron/interest -H 'Authorization: Bearer ${CRON_SECRET}'"
+```
+
+### Option 2: External Cron Service
+Use services like:
+- **EasyCron**: https://www.easycron.com
+- **cron-job.org**: https://cron-job.org
+
+Setup:
+1. Create account
+2. Add job: `POST https://your-app.onrender.com/api/cron/interest`
+3. Add header: `Authorization: Bearer YOUR_CRON_SECRET`
+4. Schedule: Daily at midnight
+
+### Option 3: GitHub Actions (Free)
+Create `.github/workflows/interest-cron.yml`:
+```yaml
+name: Calculate Interest
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+jobs:
+  calculate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Interest Calculation
+        run: |
+          curl -X POST ${{ secrets.APP_URL }}/api/cron/interest \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+```
+
+## Environment Variables
+Add to your `.env` and deployment:
+```
+CRON_SECRET=your-secure-random-string
+```
+
+## Testing
+Manually trigger:
+```bash
+curl -X POST http://localhost:5173/api/cron/interest \
+  -H "Authorization: Bearer dev-secret"
+```
+
+## Configuration
+Parents can configure in family settings:
+- `interestRate`: Percentage (e.g., 10 = 10%)
+- `interestDuration`: Days between calculations (e.g., 7 = weekly)

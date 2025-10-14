@@ -3,8 +3,10 @@ import Google from '@auth/sveltekit/providers/google';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '$lib/server/prisma';
 import { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET } from '$env/static/private';
+import { redirect } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 
-export const { GET, POST } = SvelteKitAuth({
+const { GET: authGET, POST: authPOST } = SvelteKitAuth({
   trustHost: true,
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -45,3 +47,12 @@ export const { GET, POST } = SvelteKitAuth({
     }
   }
 });
+
+export const GET = async (event: RequestEvent) => {
+  if (event.url.pathname === '/auth/favicon.ico') {
+    throw redirect(301, '/favicon.ico');
+  }
+  return authGET(event);
+};
+
+export const POST = authPOST;
