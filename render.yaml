@@ -36,3 +36,23 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      - key: CRON_SECRET
+        generateValue: true
+
+  - type: cron
+    name: treasury-interest-calculator
+    env: node
+    plan: free
+    schedule: "0 0 * * *"
+    buildCommand: echo "Cron job - no build needed"
+    startCommand: |
+      curl -X POST https://treasury-rhi2.onrender.com/api/cron/interest \
+        -H "Authorization: Bearer $CRON_SECRET" \
+        -H "Content-Type: application/json" \
+        -f -s -S
+    envVars:
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: CRON_SECRET

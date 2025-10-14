@@ -13,6 +13,9 @@ export async function calculateInterestForAllUsers() {
       }
     });
 
+    let processedUsers = 0;
+    let totalInterest = 0;
+
     for (const family of families) {
       if (!family.config) continue;
 
@@ -55,13 +58,18 @@ export async function calculateInterestForAllUsers() {
                 bonusDate: now
               }
             });
+
+            processedUsers++;
+            totalInterest += interestAmount;
           }
         }
       }
     }
 
-    console.log('Interest calculation completed');
+    console.log(`Interest calculation completed: ${processedUsers} users processed, ${totalInterest} total interest`);
+    return { processedUsers, totalInterest };
   } catch (error) {
     console.error('Interest calculation failed:', error);
+    throw error;
   }
 }
