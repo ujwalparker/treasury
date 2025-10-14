@@ -33,18 +33,42 @@ services:
           name: treasury
           envVarKey: PORT
       - key: GROQ_API_KEY
-        sync: false
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: GROQ_API_KEY
       - key: GEMINI_API_KEY
-        sync: false
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: GEMINI_API_KEY
       - key: GROQ_MODELS
-        value: groq/compound-mini
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: GROQ_MODELS
       - key: GEMINI_MODELS
-        value: gemini-2.5-flash-lite
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: GEMINI_MODELS
       - key: DEFAULT_GROQ_MODEL
-        value: groq/compound-mini
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: DEFAULT_GROQ_MODEL
       - key: DEFAULT_GEMINI_MODEL
-        value: gemini-2.5-flash-lite
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: DEFAULT_GEMINI_MODEL
       - key: GOOGLE_CLIENT_ID
-        sync: false
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: GOOGLE_CLIENT_ID
       - key: GOOGLE_CLIENT_SECRET
-        sync: false
+        fromService:
+          type: web
+          name: treasury
+          envVarKey: GOOGLE_CLIENT_SECRET
