@@ -13,62 +13,26 @@ services:
       - key: AUTH_SECRET
         generateValue: true
       - key: DATABASE_URL
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: DATABASE_URL
+        sync: false
       - key: HOST
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: HOST
-      - key: ORIGIN
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: ORIGIN
+        value: "0.0.0.0"
       - key: PORT
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: PORT
+        value: "10000"
+      - key: ORIGIN
+        sync: false
       - key: GROQ_API_KEY
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: GROQ_API_KEY
+        sync: false
       - key: GEMINI_API_KEY
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: GEMINI_API_KEY
+        sync: false
       - key: GROQ_MODELS
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: GROQ_MODELS
+        sync: false
       - key: GEMINI_MODELS
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: GEMINI_MODELS
+        sync: false
       - key: DEFAULT_GROQ_MODEL
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: DEFAULT_GROQ_MODEL
+        sync: false
       - key: DEFAULT_GEMINI_MODEL
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: DEFAULT_GEMINI_MODEL
+        sync: false
       - key: GOOGLE_CLIENT_ID
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: GOOGLE_CLIENT_ID
+        sync: false
       - key: GOOGLE_CLIENT_SECRET
-        fromService:
-          type: web
-          name: treasury
-          envVarKey: GOOGLE_CLIENT_SECRET
+        sync: false
